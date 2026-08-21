@@ -94,25 +94,6 @@ Before public deployment, add:
 - protection against malicious files
 - production WSGI server instead of Flask development server
 
-## Project structure
-
-```text
-file converter/
-│
-├── app.py
-├── requirements.txt
-├── README.md
-│
-├── templates/
-│   └── index.html
-│
-├── static/
-│   ├── style.css
-│   └── app.js
-│
-├── uploads/
-│
-└── outputs/
 
 Technologies
 Python
@@ -149,3 +130,24 @@ Offline/PWA support
 Author
 Dipesh Acharya
 GitHub: https://github.com/Acharyadipesh
+
+
+## Project structure
+
+```text
+file converter/
+│
+├── app.py
+├── requirements.txt
+├── README.md
+│
+├── templates/
+│   └── index.html
+│
+├── static/
+│   ├── style.css
+│   └── app.js
+│
+├── uploads/
+│
+└── outputs/
