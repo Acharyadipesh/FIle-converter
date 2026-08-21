@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        FileForge - File Converter
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+
+<header class="topbar">
+
+    <div class="brand">
+
+        <div class="logo">
+            F
+        </div>
+
+        <span>
+            FileForge
+        </span>
+
+    </div>
+
+
+    <nav>
+
+        <a href="#tools">
+            Tools
+        </a>
+
+        <a href="#how">
+            How it works
+        </a>
+
+    </nav>
+
+</header>
+
+
+
+<main>
+
+
+<section class="hero">
+
+    <div class="pill">
+        Fast • Simple • Private
+    </div>
+
+
+    <h1>
+
+        Convert files
+
+        <br>
+
+        <span>
+            without the hassle.
+        </span>
+
+    </h1>
+
+
+    <p>
+
+        Convert, compress and manage your
+        documents and images from one place.
+
+    </p>
+
+</section>
+
+
+
+<section
+    id="tools"
+    class="tool-grid"
+>
+
+
+    <button
+        class="tool active"
+        data-task="pdf-to-ppt"
+        data-accept=".pdf"
+    >
+
+        <b>
+            PDF → PPT
+        </b>
+
+        <small>
+            Convert PDF pages to PowerPoint
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="ppt-to-pdf"
+        data-accept=".ppt,.pptx"
+    >
+
+        <b>
+            PPT → PDF
+        </b>
+
+        <small>
+            Convert PowerPoint to PDF
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="jpg-to-png"
+        data-accept=".jpg,.jpeg"
+    >
+
+        <b>
+            JPG → PNG
+        </b>
+
+        <small>
+            Convert JPG images to PNG
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="png-to-jpg"
+        data-accept=".png"
+    >
+
+        <b>
+            PNG → JPG
+        </b>
+
+        <small>
+            Convert PNG images to JPG
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="pdf-to-jpg"
+        data-accept=".pdf"
+    >
+
+        <b>
+            PDF → JPG
+        </b>
+
+        <small>
+            Convert PDF pages to JPG
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="jpg-to-pdf"
+        data-accept=".jpg,.jpeg"
+    >
+
+        <b>
+            JPG → PDF
+        </b>
+
+        <small>
+            Create a PDF from JPG images
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="png-to-pdf"
+        data-accept=".png"
+    >
+
+        <b>
+            PNG → PDF
+        </b>
+
+        <small>
+            Create a PDF from PNG images
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="merge-pdf"
+        data-accept=".pdf"
+        data-multiple="true"
+    >
+
+        <b>
+            Merge PDF
+        </b>
+
+        <small>
+            Combine multiple PDF files
+        </small>
+
+    </button>
+
+
+    <button
+        class="tool"
+        data-task="compress-image"
+        data-accept=".jpg,.jpeg,.png,.webp"
+    >
+
+        <b>
+            Compress Image
+        </b>
+
+        <small>
+            Reduce image size while maintaining quality
+        </small>
+
+    </button>
+
+
+</section>
+
+
+
+<section class="converter">
+
+
+    <div class="converter-head">
+
+
+        <div>
+
+            <div class="eyebrow">
+                Selected tool
+            </div>
+
+
+            <h2 id="toolTitle">
+                PDF to PowerPoint
+            </h2>
+
+
+            <p id="toolDesc">
+                Upload a PDF and receive a PPTX presentation.
+            </p>
+
+        </div>
+
+
+        <span
+            id="fileType"
+            class="filetype"
+        >
+            PDF
+        </span>
+
+    </div>
+
+
+
+    <div
+        id="compressionSettings"
+        class="compression-settings"
+        hidden
+    >
+
+        <label>
+
+            <span>
+                Compression level
+            </span>
+
+
+            <select
+                id="qualitySelect"
+            >
+
+                <option value="85">
+                    Low compression — Best quality
+                </option>
+
+
+                <option
+                    value="70"
+                    selected
+                >
+                    Recommended — Good balance
+                </option>
+
+
+                <option value="50">
+                    High compression — Smaller file
+                </option>
+
+
+                <option value="30">
+                    Extreme compression — Smallest file
+                </option>
+
+            </select>
+
+        </label>
+
+    </div>
+
+
+
+    <div
+        id="dropzone"
+        class="dropzone"
+    >
+
+
+        <div class="upload-icon">
+            ↑
+        </div>
+
+
+        <h3>
+            Drop your file here
+        </h3>
+
+
+        <p>
+            or
+        </p>
+
+
+        <label class="choose">
+
+            Choose file
+
+            <input
+                id="fileInput"
+                type="file"
+                hidden
+            >
+
+        </label>
+
+
+        <div
+            id="fileInfo"
+            class="file-info"
+        ></div>
+
+
+    </div>
+
+
+
+    <div class="actions">
+
+        <button
+            id="convertBtn"
+            class="primary"
+        >
+            Convert now
+        </button>
+
+
+        <button
+            id="clearBtn"
+            class="secondary"
+        >
+            Clear
+        </button>
+
+    </div>
+
+
+
+    <div
+        id="status"
+        class="status"
+    ></div>
+
+
+    <a
+        id="download"
+        class="download"
+        hidden
+    >
+        Download converted file
+    </a>
+
+
+</section>
+
+
+
+<section
+    id="how"
+    class="how"
+>
+
+    <h2>
+        Built for everyday file work
+    </h2>
+
+
+    <div class="steps">
+
+
+        <div>
+
+            <span>
+                01
+            </span>
+
+            <b>
+                Pick a tool
+            </b>
+
+            <p>
+                Select the conversion you need.
+            </p>
+
+        </div>
+
+
+        <div>
+
+            <span>
+                02
+            </span>
+
+            <b>
+                Upload
+            </b>
+
+            <p>
+                Drop your file into the converter.
+            </p>
+
+        </div>
+
+
+        <div>
+
+            <span>
+                03
+            </span>
+
+            <b>
+                Convert
+            </b>
+
+            <p>
+                Download your converted file.
+            </p>
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+</main>
+
+
+
+<footer>
+
+    FileForge
+    •
+    PDF, Image & Document Tools
+
+</footer>
+
+
+
+<script
+    src="{{ url_for('static', filename='app.js') }}"
+></script>
+
+
+</body>
+
+</html>
