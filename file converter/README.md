@@ -36,8 +36,7 @@ A self-hosted iLovePDF-style starter website built with HTML, CSS, JavaScript an
 
    `pip install -r requirements.txt`
 
-6. For PPT → PDF, install LibreOffice and make sure `soffice.exe` is in PATH.
-   If it is installed but not in PATH, add its `program` folder to PATH.
+6. 6. For PPT → PDF, install LibreOffice and make sure `soffice.exe` is in PATH. If it is installed but not in PATH, add its `program` folder to PATH.
 
 7. Start:
 
