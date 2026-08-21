@@ -45,6 +45,7 @@ A self-hosted iLovePDF-style starter website built with HTML, CSS, JavaScript an
 
    Official download:
    https://www.libreoffice.org/download/
+
 7. Start:
 
    `python app.py`
