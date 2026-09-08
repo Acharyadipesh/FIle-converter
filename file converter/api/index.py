@@ -37,7 +37,17 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-app = Flask(__name__)
+# ============================================================
+# FIX: Tell Flask where to find templates and static files
+# ============================================================
+
+# Since this file is inside 'api/' and templates are one level up,
+# we need to specify the full relative paths.
+app = Flask(
+    __name__,
+    template_folder='../templates',   # go up one level from api/ to the root
+    static_folder='../static'         # go up one level from api/ to the root
+)
 
 # Maximum upload size = 100 MB
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
@@ -483,9 +493,8 @@ def convert():
         return jsonify({"error": str(error)}), 500
 
     finally:
-        # Clean up uploaded files (outputs are cleaned up on download or later)
+        # Clean up uploaded files
         shutil.rmtree(job_upload, ignore_errors=True)
-        # Optionally clean output after a while, but we keep for download
 
 
 # ============================================================
