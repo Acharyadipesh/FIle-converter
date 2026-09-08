@@ -123,12 +123,12 @@ GitHub: [https://github.com/Acharyadipesh](https://github.com/Acharyadipesh)
 file converter/
 │
 ├── api/
-│ └── index.py # Main Flask application
+│   └── index.py          # Main Flask application
 ├── static/
-│ ├── style.css
-│ └── app.js
+│   ├── style.css
+│   └── app.js
 ├── templates/
-│ └── index.html
+│   └── index.html
 ├── requirements.txt
-├── vercel.json # Vercel deployment configuration
+├── vercel.json           # Vercel deployment configuration
 └── README.md
