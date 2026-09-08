@@ -26,8 +26,8 @@ The application is live at: [https://f-ile-converter.vercel.app/](https://f-ile-
 1. **Install Python 3.11+**.
 2. **Open CMD/PowerShell** in this folder.
 3. **Create a virtual environment**:
-
 python -m venv .venv
+
 4. **Activate it**:
 - **PowerShell**: `.venv\Scripts\Activate.ps1`
 - **CMD**: `.venv\Scripts\activate`
