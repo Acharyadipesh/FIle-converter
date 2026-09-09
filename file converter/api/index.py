@@ -4,6 +4,7 @@ import shutil
 import zipfile
 from pathlib import Path
 import tempfile
+import time
 
 from flask import (
     Flask,
@@ -27,9 +28,7 @@ from pptx.util import Inches
 # APPLICATION CONFIGURATION
 # ============================================================
 
-# Use /tmp for Vercel (writable) – clean up after each request
 BASE_DIR = Path(tempfile.gettempdir())
-
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "outputs"
 
@@ -37,19 +36,12 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# ============================================================
-# FIX: Tell Flask where to find templates and static files
-# ============================================================
-
-# Since this file is inside 'api/' and templates are one level up,
-# we need to specify the full relative paths.
 app = Flask(
     __name__,
-    template_folder='../templates',   # go up one level from api/ to the root
-    static_folder='../static'         # go up one level from api/ to the root
+    template_folder='../templates',
+    static_folder='../static'
 )
 
-# Maximum upload size = 100 MB
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
 
@@ -58,43 +50,15 @@ app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 # ============================================================
 
 ALLOWED = {
-
-    "pdf-to-ppt": {
-        ".pdf"
-    },
-
-    # PPT → PDF is DISABLED on Vercel (no LibreOffice)
-    # "ppt-to-pdf": {
-    #     ".ppt", ".pptx"
-    # },
-
-    "jpg-to-png": {
-        ".jpg", ".jpeg"
-    },
-
-    "png-to-jpg": {
-        ".png"
-    },
-
-    "pdf-to-jpg": {
-        ".pdf"
-    },
-
-    "jpg-to-pdf": {
-        ".jpg", ".jpeg"
-    },
-
-    "png-to-pdf": {
-        ".png"
-    },
-
-    "merge-pdf": {
-        ".pdf"
-    },
-
-    "compress-image": {
-        ".jpg", ".jpeg", ".png", ".webp"
-    }
+    "pdf-to-ppt": {".pdf"},
+    # "ppt-to-pdf" removed (LibreOffice not available)
+    "jpg-to-png": {".jpg", ".jpeg"},
+    "png-to-jpg": {".png"},
+    "pdf-to-jpg": {".pdf"},
+    "jpg-to-pdf": {".jpg", ".jpeg"},
+    "png-to-pdf": {".png"},
+    "merge-pdf": {".pdf"},
+    "compress-image": {".jpg", ".jpeg", ".png", ".webp"}
 }
 
 
@@ -115,58 +79,33 @@ def safe_filename(filename):
 
 def convert_pdf_to_ppt(pdf_file, output_file):
     pdf = fitz.open(str(pdf_file))
-
     if len(pdf) == 0:
         pdf.close()
         raise ValueError("The PDF contains no pages.")
 
     first_page = pdf[0].rect
-
     presentation = Presentation()
     presentation.slide_width = Inches(10)
     presentation.slide_height = Inches(
         10 * first_page.height / first_page.width
     )
-
     blank_layout = presentation.slide_layouts[6]
 
-    for page_number, page in enumerate(pdf, start=1):
-        pixmap = page.get_pixmap(
-            matrix=fitz.Matrix(1.6, 1.6),
-            alpha=False
-        )
-
-        temporary_image = (
-            OUTPUT_DIR /
-            f"temp_{uuid.uuid4().hex}.jpg"
-        )
-
-        pixmap.save(str(temporary_image))
-
+    for page in pdf:
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False)
+        temp_img = OUTPUT_DIR / f"temp_{uuid.uuid4().hex}.jpg"
+        pixmap.save(str(temp_img))
         slide = presentation.slides.add_slide(blank_layout)
         slide.shapes.add_picture(
-            str(temporary_image),
-            0,
-            0,
+            str(temp_img),
+            0, 0,
             width=presentation.slide_width,
             height=presentation.slide_height
         )
-
-        temporary_image.unlink(missing_ok=True)
+        temp_img.unlink(missing_ok=True)
 
     presentation.save(str(output_file))
     pdf.close()
-
-
-# ============================================================
-# PPT → PDF – DISABLED on Vercel (no LibreOffice)
-# ============================================================
-
-def convert_ppt_to_pdf(input_file, output_file):
-    raise RuntimeError(
-        "PPT to PDF conversion is not available on this server "
-        "(LibreOffice is not installed). Please use another tool."
-    )
 
 
 # ============================================================
@@ -176,29 +115,18 @@ def convert_ppt_to_pdf(input_file, output_file):
 def convert_image(input_file, output_file, output_format):
     with Image.open(input_file) as image:
         if output_format == "JPEG":
-            # JPEG does not support transparency
             if image.mode in ("RGBA", "LA", "P"):
                 if image.mode == "P":
                     image = image.convert("RGBA")
-
                 background = Image.new("RGB", image.size, "white")
                 if "A" in image.getbands():
-                    background.paste(
-                        image,
-                        mask=image.getchannel("A")
-                    )
+                    background.paste(image, mask=image.getchannel("A"))
                 else:
                     background.paste(image)
-
                 image = background
             else:
                 image = image.convert("RGB")
-
-        image.save(
-            output_file,
-            format=output_format,
-            quality=95
-        )
+        image.save(output_file, format=output_format, quality=95)
 
 
 # ============================================================
@@ -207,45 +135,19 @@ def convert_image(input_file, output_file, output_format):
 
 def compress_image(input_file, output_file, quality):
     with Image.open(input_file) as image:
-        image_format = image.format
-
-        if image_format in ("JPEG", "JPG"):
+        fmt = image.format
+        if fmt in ("JPEG", "JPG"):
             if image.mode != "RGB":
                 image = image.convert("RGB")
-            image.save(
-                output_file,
-                format="JPEG",
-                quality=quality,
-                optimize=True,
-                progressive=True
-            )
-
-        elif image_format == "PNG":
-            has_transparency = "A" in image.getbands()
-            if has_transparency:
-                image.save(
-                    output_file,
-                    format="PNG",
-                    optimize=True,
-                    compress_level=9
-                )
+            image.save(output_file, format="JPEG", quality=quality, optimize=True, progressive=True)
+        elif fmt == "PNG":
+            if "A" in image.getbands():
+                image.save(output_file, format="PNG", optimize=True, compress_level=9)
             else:
                 image = image.convert("RGB")
-                image.save(
-                    output_file,
-                    format="JPEG",
-                    quality=quality,
-                    optimize=True,
-                    progressive=True
-                )
-
-        elif image_format == "WEBP":
-            image.save(
-                output_file,
-                format="WEBP",
-                quality=quality,
-                method=6
-            )
+                image.save(output_file, format="JPEG", quality=quality, optimize=True, progressive=True)
+        elif fmt == "WEBP":
+            image.save(output_file, format="WEBP", quality=quality, method=6)
         else:
             raise ValueError("Unsupported image format.")
 
@@ -257,44 +159,35 @@ def compress_image(input_file, output_file, quality):
 def convert_pdf_to_jpg(pdf_file, output_directory):
     pdf = fitz.open(str(pdf_file))
     pages = []
-
-    for page_number, page in enumerate(pdf, start=1):
-        pixmap = page.get_pixmap(
-            matrix=fitz.Matrix(1.8, 1.8),
-            alpha=False
-        )
-
-        output = output_directory / f"page-{page_number}.jpg"
-        pixmap.save(str(output))
-        pages.append(output)
-
+    for i, page in enumerate(pdf, start=1):
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(1.8, 1.8), alpha=False)
+        out = output_directory / f"page-{i}.jpg"
+        pixmap.save(str(out))
+        pages.append(out)
     pdf.close()
     return pages
 
 
 # ============================================================
-# IMAGES → PDF
+# IMAGES → PDF (improved)
 # ============================================================
 
 def convert_images_to_pdf(image_files, output_file):
     images = []
     try:
-        for file in image_files:
-            image = Image.open(file)
-            image = image.convert("RGB")
-            images.append(image)
-
+        for f in image_files:
+            img = Image.open(f)
+            # Convert to RGB (PDF doesn't support RGBA)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            images.append(img)
         if not images:
-            raise ValueError("No images were selected.")
-
-        images[0].save(
-            output_file,
-            save_all=True,
-            append_images=images[1:]
-        )
+            raise ValueError("No images provided.")
+        # Save as PDF
+        images[0].save(output_file, save_all=True, append_images=images[1:])
     finally:
-        for image in images:
-            image.close()
+        for img in images:
+            img.close()
 
 
 # ============================================================
@@ -303,8 +196,8 @@ def convert_images_to_pdf(image_files, output_file):
 
 def merge_pdf_files(pdf_files, output_file):
     merged = fitz.open()
-    for file in pdf_files:
-        pdf = fitz.open(str(file))
+    for f in pdf_files:
+        pdf = fitz.open(str(f))
         merged.insert_pdf(pdf)
         pdf.close()
     merged.save(str(output_file))
@@ -338,60 +231,36 @@ def convert():
     job_id = uuid.uuid4().hex
     job_upload = UPLOAD_DIR / job_id
     job_output = OUTPUT_DIR / job_id
-
     job_upload.mkdir(parents=True, exist_ok=True)
     job_output.mkdir(parents=True, exist_ok=True)
 
     saved_files = []
+    output_file = None
 
     try:
-        # ----------------------------------------------------
-        # SAVE UPLOADED FILES
-        # ----------------------------------------------------
+        # Save uploaded files
         for uploaded in uploaded_files:
             filename = safe_filename(uploaded.filename)
-            extension = Path(filename).suffix.lower()
-
-            if extension not in ALLOWED[task]:
-                raise ValueError(
-                    f"File type {extension} is not supported for this tool."
-                )
-
+            ext = Path(filename).suffix.lower()
+            if ext not in ALLOWED[task]:
+                raise ValueError(f"File type {ext} not supported for this tool.")
             path = job_upload / filename
             uploaded.save(str(path))
             saved_files.append(path)
 
-        # ----------------------------------------------------
-        # PDF → PPT
-        # ----------------------------------------------------
+        # Perform conversion
         if task == "pdf-to-ppt":
             output_file = job_output / f"{saved_files[0].stem}.pptx"
             convert_pdf_to_ppt(saved_files[0], output_file)
 
-        # ----------------------------------------------------
-        # PPT → PDF (DISABLED)
-        # ----------------------------------------------------
-        elif task == "ppt-to-pdf":
-            output_file = job_output / f"{saved_files[0].stem}.pdf"
-            convert_ppt_to_pdf(saved_files[0], output_file)
-
-        # ----------------------------------------------------
-        # JPG → PNG
-        # ----------------------------------------------------
         elif task == "jpg-to-png":
             output_file = job_output / f"{saved_files[0].stem}.png"
             convert_image(saved_files[0], output_file, "PNG")
 
-        # ----------------------------------------------------
-        # PNG → JPG
-        # ----------------------------------------------------
         elif task == "png-to-jpg":
             output_file = job_output / f"{saved_files[0].stem}.jpg"
             convert_image(saved_files[0], output_file, "JPEG")
 
-        # ----------------------------------------------------
-        # PDF → JPG
-        # ----------------------------------------------------
         elif task == "pdf-to-jpg":
             pages = convert_pdf_to_jpg(saved_files[0], job_output)
             if len(pages) == 1:
@@ -402,69 +271,44 @@ def convert():
                     for page in pages:
                         archive.write(page, page.name)
 
-        # ----------------------------------------------------
-        # JPG → PDF
-        # ----------------------------------------------------
         elif task == "jpg-to-pdf":
             output_file = job_output / "converted-images.pdf"
             convert_images_to_pdf(saved_files, output_file)
 
-        # ----------------------------------------------------
-        # PNG → PDF
-        # ----------------------------------------------------
         elif task == "png-to-pdf":
             output_file = job_output / "converted-images.pdf"
             convert_images_to_pdf(saved_files, output_file)
 
-        # ----------------------------------------------------
-        # MERGE PDF
-        # ----------------------------------------------------
         elif task == "merge-pdf":
             if len(saved_files) < 2:
-                raise ValueError("Please select at least two PDF files.")
+                raise ValueError("Select at least two PDF files to merge.")
             output_file = job_output / "merged.pdf"
             merge_pdf_files(saved_files, output_file)
 
-        # ----------------------------------------------------
-        # COMPRESS IMAGE
-        # ----------------------------------------------------
         elif task == "compress-image":
             if len(saved_files) != 1:
-                raise ValueError("Please select exactly one image.")
-
-            quality_text = request.form.get("quality", "70")
-            try:
-                quality = int(quality_text)
-            except (ValueError, TypeError):
-                quality = 70
+                raise ValueError("Select exactly one image.")
+            quality = int(request.form.get("quality", 70))
             quality = max(10, min(95, quality))
-
             source = saved_files[0]
-            extension = source.suffix.lower()
-
-            with Image.open(source) as image:
-                has_alpha = "A" in image.getbands()
-                image_format = image.format
-
-            if extension == ".png" and has_alpha:
+            with Image.open(source) as img:
+                has_alpha = "A" in img.getbands()
+                fmt = img.format
+            ext = source.suffix.lower()
+            if ext == ".png" and has_alpha:
                 output_file = job_output / f"{source.stem}-compressed.png"
-            elif extension == ".webp":
+            elif ext == ".webp":
                 output_file = job_output / f"{source.stem}-compressed.webp"
             else:
                 output_file = job_output / f"{source.stem}-compressed.jpg"
-
             compress_image(source, output_file, quality)
 
         else:
             raise ValueError("Unknown conversion task.")
 
-        # ----------------------------------------------------
-        # VERIFY OUTPUT
-        # ----------------------------------------------------
-        if not output_file.exists():
-            raise RuntimeError(
-                "Conversion completed but the output file was not created."
-            )
+        # Verify output
+        if not output_file or not output_file.exists():
+            raise RuntimeError("Output file was not created.")
 
         original_size = saved_files[0].stat().st_size
         output_size = output_file.stat().st_size
@@ -481,20 +325,23 @@ def convert():
             "saved_percent": saved_percent
         })
 
-    except Exception as error:
-        print()
-        print("========================================")
+    except Exception as e:
+        # Log the error (viewable in Vercel logs)
+        print("=" * 50)
         print("CONVERSION ERROR")
-        print("========================================")
-        print(str(error))
-        print("========================================")
-        print()
+        print("Task:", task)
+        print("Files:", [f.name for f in saved_files] if saved_files else "None")
+        print("Error:", str(e))
+        import traceback
+        traceback.print_exc()
+        print("=" * 50)
 
-        return jsonify({"error": str(error)}), 500
+        return jsonify({"error": str(e)}), 500
 
     finally:
-        # Clean up uploaded files
+        # Clean up uploaded files (keep outputs for download)
         shutil.rmtree(job_upload, ignore_errors=True)
+        # Optionally clean output later
 
 
 # ============================================================
@@ -505,10 +352,8 @@ def convert():
 def download(job_id, filename):
     filename = secure_filename(filename)
     file_path = OUTPUT_DIR / job_id / filename
-
     if not file_path.exists():
         return "File not found.", 404
-
     return send_file(
         str(file_path),
         as_attachment=True,
@@ -522,25 +367,13 @@ def download(job_id, filename):
 
 @app.errorhandler(413)
 def too_large(error):
-    return jsonify({
-        "error": "The file is too large. Maximum size is 100 MB."
-    }), 413
+    return jsonify({"error": "File too large. Max size is 100 MB."}), 413
 
 
 # ============================================================
-# START SERVER (only for local development)
+# START SERVER (local development)
 # ============================================================
 
 if __name__ == "__main__":
-    print()
-    print("==============================================")
-    print("          FILEFORGE CONVERTER")
-    print("==============================================")
-    print()
-    print("NOTE: PPT → PDF is disabled on Vercel.")
-    print("     (LibreOffice not available)")
-    print()
-    print("Website: http://127.0.0.1:5000")
-    print()
-
+    print("FileForge started at http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=True)
