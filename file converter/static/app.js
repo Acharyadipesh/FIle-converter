@@ -265,7 +265,9 @@ tools.forEach(
                     fileInput.multiple =
                         currentMultiple ||
                         currentTask ===
-                        "jpg-to-pdf";
+                        "jpg-to-pdf" ||
+                        currentTask ===
+                        "png-to-pdf";
 
                     compressionSettings.hidden =
                         true;
@@ -292,11 +294,20 @@ tools.forEach(
 fileInput.addEventListener(
     "change",
     () => {
-
-        showSelectedFiles(
-            fileInput.files
-        );
-
+        const files = fileInput.files;
+        
+        // Limit check for image-to-PDF conversions
+        if (
+            (currentTask === "jpg-to-pdf" || currentTask === "png-to-pdf") &&
+            files.length > 5
+        ) {
+            showError("Maximum 5 images allowed for PDF conversion.");
+            fileInput.value = "";
+            fileInfo.textContent = "";
+            return;
+        }
+        
+        showSelectedFiles(files);
     }
 );
 
@@ -401,20 +412,21 @@ dropzone.addEventListener(
             "drag"
         );
 
-
         const files =
             event.dataTransfer.files;
-
+        
+        // Limit check for image-to-PDF conversions
+        if (
+            (currentTask === "jpg-to-pdf" || currentTask === "png-to-pdf") &&
+            files.length > 5
+        ) {
+            showError("Maximum 5 images allowed for PDF conversion.");
+            return;
+        }
 
         if (
-
-            currentTask ===
-            "compress-image"
-
-            &&
-
+            currentTask === "compress-image" &&
             files.length > 1
-
         ) {
 
             showError(
@@ -871,11 +883,37 @@ themeToggle.addEventListener(
 
     }
 );
+
+
 // ============================================================
-// COPYRIGHT YEAR — Dynamic
+
 // ============================================================
 
 const yearElement = document.getElementById('year');
 if (yearElement) {
     yearElement.textContent = new Date().getFullYear();
 }
+
+
+// ============================================================
+
+// ============================================================
+
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function(e) {
+        const targetId = this.getAttribute('href');
+        const targetElement = document.querySelector(targetId);
+
+        if (targetElement) {
+            e.preventDefault();
+            const headerOffset = 80; // Height of fixed header
+            const elementPosition = targetElement.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+            window.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
+    });
+});
