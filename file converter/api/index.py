@@ -4,7 +4,6 @@ import shutil
 import zipfile
 from pathlib import Path
 import tempfile
-import time
 
 from flask import (
     Flask,
@@ -42,7 +41,7 @@ app = Flask(
     static_folder='../static'
 )
 
-app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB total upload
 
 
 # ============================================================
@@ -51,7 +50,6 @@ app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
 
 ALLOWED = {
     "pdf-to-ppt": {".pdf"},
-    # "ppt-to-pdf" removed (LibreOffice not available)
     "jpg-to-png": {".jpg", ".jpeg"},
     "png-to-jpg": {".png"},
     "pdf-to-jpg": {".pdf"},
@@ -109,7 +107,7 @@ def convert_pdf_to_ppt(pdf_file, output_file):
 
 
 # ============================================================
-# IMAGE CONVERSION
+# IMAGE CONVERSION (single)
 # ============================================================
 
 def convert_image(input_file, output_file, output_format):
@@ -169,22 +167,49 @@ def convert_pdf_to_jpg(pdf_file, output_directory):
 
 
 # ============================================================
-# IMAGES → PDF (improved)
+# IMAGES → PDF 
 # ============================================================
 
-def convert_images_to_pdf(image_files, output_file):
+def convert_images_to_pdf(image_files, output_file, max_dimension=1500):
+    """
+    Convert a list of image files to a single PDF.
+    - Rejects any image larger than 5 MB before processing.
+    - Resizes images to max_dimension (default 1500px) to keep PDF size small.
+    - Uses JPEG compression with quality 85 for the PDF.
+    """
     images = []
     try:
         for f in image_files:
+            # Check file size 
+            file_size_mb = f.stat().st_size / (1024 * 1024)
+            if file_size_mb > 5:
+                raise ValueError(f"Image '{f.name}' is {file_size_mb:.1f} MB, which exceeds the 5 MB limit.")
+
             img = Image.open(f)
-            # Convert to RGB (PDF doesn't support RGBA)
+
+            # Resize if too large
+            if max(img.size) > max_dimension:
+                ratio = max_dimension / max(img.size)
+                new_size = (int(img.size[0] * ratio), int(img.size[1] * ratio))
+                img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+            # Convert to RGB (PDF doesn't support transparency)
             if img.mode != "RGB":
                 img = img.convert("RGB")
+
             images.append(img)
+
         if not images:
-            raise ValueError("No images provided.")
-        # Save as PDF
-        images[0].save(output_file, save_all=True, append_images=images[1:])
+            raise ValueError("No valid images provided.")
+
+        # Save as PDF with compression
+        images[0].save(
+            output_file,
+            save_all=True,
+            append_images=images[1:],
+            quality=85,
+            optimize=True
+        )
     finally:
         for img in images:
             img.close()
@@ -205,17 +230,13 @@ def merge_pdf_files(pdf_files, output_file):
 
 
 # ============================================================
-# HOME
+# ROUTES
 # ============================================================
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
-
-# ============================================================
-# CONVERSION API
-# ============================================================
 
 @app.route("/api/convert", methods=["POST"])
 def convert():
@@ -238,7 +259,7 @@ def convert():
     output_file = None
 
     try:
-        # Save uploaded files
+        # Save files (and check individual size for image-to-PDF tasks)
         for uploaded in uploaded_files:
             filename = safe_filename(uploaded.filename)
             ext = Path(filename).suffix.lower()
@@ -293,7 +314,6 @@ def convert():
             source = saved_files[0]
             with Image.open(source) as img:
                 has_alpha = "A" in img.getbands()
-                fmt = img.format
             ext = source.suffix.lower()
             if ext == ".png" and has_alpha:
                 output_file = job_output / f"{source.stem}-compressed.png"
@@ -310,7 +330,7 @@ def convert():
         if not output_file or not output_file.exists():
             raise RuntimeError("Output file was not created.")
 
-        original_size = saved_files[0].stat().st_size
+        original_size = saved_files[0].stat().st_size if saved_files else 0
         output_size = output_file.stat().st_size
         saved_percent = 0
         if original_size > 0:
@@ -326,7 +346,7 @@ def convert():
         })
 
     except Exception as e:
-        # Log the error (viewable in Vercel logs)
+        
         print("=" * 50)
         print("CONVERSION ERROR")
         print("Task:", task)
@@ -339,14 +359,8 @@ def convert():
         return jsonify({"error": str(e)}), 500
 
     finally:
-        # Clean up uploaded files (keep outputs for download)
         shutil.rmtree(job_upload, ignore_errors=True)
-        # Optionally clean output later
 
-
-# ============================================================
-# DOWNLOAD
-# ============================================================
 
 @app.route("/download/<job_id>/<filename>")
 def download(job_id, filename):
@@ -361,18 +375,10 @@ def download(job_id, filename):
     )
 
 
-# ============================================================
-# ERROR HANDLER
-# ============================================================
-
 @app.errorhandler(413)
 def too_large(error):
-    return jsonify({"error": "File too large. Max size is 100 MB."}), 413
+    return jsonify({"error": "File too large. Max total upload size is 100 MB."}), 413
 
-
-# ============================================================
-# START SERVER (local development)
-# ============================================================
 
 if __name__ == "__main__":
     print("FileForge started at http://127.0.0.1:5000")
